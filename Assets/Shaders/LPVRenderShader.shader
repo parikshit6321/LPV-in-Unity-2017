@@ -13,9 +13,17 @@
 
 		#include "UnityCG.cginc"
 
-		uniform sampler3D					lpvRedSH;
-		uniform sampler3D					lpvGreenSH;
-		uniform sampler3D					lpvBlueSH;
+		uniform sampler3D					lpvRedSHFirstCascade;
+		uniform sampler3D					lpvGreenSHFirstCascade;
+		uniform sampler3D					lpvBlueSHFirstCascade;
+
+		uniform sampler3D					lpvRedSHSecondCascade;
+		uniform sampler3D					lpvGreenSHSecondCascade;
+		uniform sampler3D					lpvBlueSHSecondCascade;
+
+		uniform sampler3D					lpvRedSHThirdCascade;
+		uniform sampler3D					lpvGreenSHThirdCascade;
+		uniform sampler3D					lpvBlueSHThirdCascade;
 
 		uniform sampler2D 					_MainTex;
 		uniform sampler2D					_CameraDepthTexture;
@@ -27,7 +35,9 @@
 		uniform float4x4					InverseProjectionMatrix;
 		uniform float4x4					InverseViewMatrix;
 
-		uniform float						worldVolumeBoundary;
+		uniform float						firstCascadeBoundary;
+		uniform float						secondCascadeBoundary;
+		uniform float						thirdCascadeBoundary;
 		uniform float						indirectLightStrength;
 
 		uniform int							lpvDimension;
@@ -69,10 +79,28 @@
 			return float4(SH_C0, -SH_C1 * dir.y, SH_C1 * dir.z, -SH_C1 * dir.x);
 		}
 
-		// Function to get position of cell in the grid from world position
-		inline float3 GetCellPosition (float3 worldPosition)
+		// Function to get position of cell in the first cascade from world position
+		inline float3 GetCellPositionFirstCascade (float3 worldPosition)
 		{
-			float3 encodedPosition = worldPosition / worldVolumeBoundary;
+			float3 encodedPosition = worldPosition / firstCascadeBoundary;
+			encodedPosition += float3(1.0f, 1.0f, 1.0f);
+			encodedPosition /= 2.0f;
+			return encodedPosition;
+		}
+
+		// Function to get position of cell in the second cascade from world position
+		inline float3 GetCellPositionSecondCascade (float3 worldPosition)
+		{
+			float3 encodedPosition = worldPosition / secondCascadeBoundary;
+			encodedPosition += float3(1.0f, 1.0f, 1.0f);
+			encodedPosition /= 2.0f;
+			return encodedPosition;
+		}
+
+		// Function to get position of cell in the third cascade from world position
+		inline float3 GetCellPositionThirdCascade (float3 worldPosition)
+		{
+			float3 encodedPosition = worldPosition / thirdCascadeBoundary;
 			encodedPosition += float3(1.0f, 1.0f, 1.0f);
 			encodedPosition /= 2.0f;
 			return encodedPosition;
@@ -137,13 +165,38 @@
 			float3 worldPosition = tex2D(positionTexture, i.uv);
 			float3 worldNormal = tex2D(normalTexture, i.uv);
 
-			float3 cellPosition = GetCellPosition(worldPosition);
-
 			float4 SHintensity = dirToSH(normalize(-worldNormal));
 
-			float4 currentCellRedSH = tex3D(lpvRedSH, cellPosition);
-			float4 currentCellGreenSH = tex3D(lpvGreenSH, cellPosition);
-			float4 currentCellBlueSH = tex3D(lpvBlueSH, cellPosition);
+			float3 cellPosition = float3(0.0f, 0.0f, 0.0f);
+
+			float4 currentCellRedSH = float4(0.0f, 0.0f, 0.0f, 0.0f);
+			float4 currentCellGreenSH = float4(0.0f, 0.0f, 0.0f, 0.0f);
+			float4 currentCellBlueSH = float4(0.0f, 0.0f, 0.0f, 0.0f);
+
+			if ((worldPosition.x < firstCascadeBoundary) && (worldPosition.y < firstCascadeBoundary) && (worldPosition.z < firstCascadeBoundary))
+			{
+				cellPosition = GetCellPositionFirstCascade(worldPosition);
+
+				currentCellRedSH = tex3D(lpvRedSHFirstCascade, cellPosition);
+				currentCellGreenSH = tex3D(lpvGreenSHFirstCascade, cellPosition);
+				currentCellBlueSH = tex3D(lpvBlueSHFirstCascade, cellPosition);
+			} 
+			else if ((worldPosition.x < secondCascadeBoundary) && (worldPosition.y < secondCascadeBoundary) && (worldPosition.z < secondCascadeBoundary))
+			{
+				cellPosition = GetCellPositionSecondCascade(worldPosition);
+
+				currentCellRedSH = tex3D(lpvRedSHSecondCascade, cellPosition);
+				currentCellGreenSH = tex3D(lpvGreenSHSecondCascade, cellPosition);
+				currentCellBlueSH = tex3D(lpvBlueSHSecondCascade, cellPosition);
+			}
+			else
+			{
+				cellPosition = GetCellPositionThirdCascade(worldPosition);
+
+				currentCellRedSH = tex3D(lpvRedSHThirdCascade, cellPosition);
+				currentCellGreenSH = tex3D(lpvGreenSHThirdCascade, cellPosition);
+				currentCellBlueSH = tex3D(lpvBlueSHThirdCascade, cellPosition);
+			}
 
 			indirect = float3(dot(SHintensity, currentCellRedSH), dot(SHintensity, currentCellGreenSH), dot(SHintensity, currentCellBlueSH));
 			indirect = (max(0.0f, indirect) / PI);

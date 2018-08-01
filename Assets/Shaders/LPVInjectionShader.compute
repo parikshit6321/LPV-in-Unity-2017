@@ -32,7 +32,7 @@ Texture2D<float4> normalTexture;
 int lpvDimension;
 
 // Boundary of the LPV Grid
-float worldVolumeBoundary;
+float cascadeBoundary;
 
 inline float4 dirToCosineLobe(float3 dir) {
 	return float4(SH_cosLobe_C0, -SH_cosLobe_C1 * dir.y, SH_cosLobe_C1 * dir.z, -SH_cosLobe_C1 * dir.x);
@@ -45,7 +45,7 @@ inline float4 dirToSH(float3 dir) {
 // Function to get position of cell in the grid from world position
 inline uint3 GetCellPosition (float3 worldPosition)
 {
-	float3 encodedPosition = worldPosition / worldVolumeBoundary;
+	float3 encodedPosition = worldPosition / cascadeBoundary;
 	encodedPosition += float3(1.0f, 1.0f, 1.0f);
 	encodedPosition /= 2.0f;
 
