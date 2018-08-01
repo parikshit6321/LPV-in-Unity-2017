@@ -19,13 +19,13 @@ public class LPVLighting : MonoBehaviour {
 	private RenderTexture positionTexture = null;
 	private RenderTexture normalTexture = null;
 
-	public RenderTexture lpvRedSH = null;
-	public RenderTexture lpvGreenSH = null;
-	public RenderTexture lpvBlueSH = null;
-	public RenderTexture lpvLuminance = null;
+	private RenderTexture lpvRedSH = null;
+	private RenderTexture lpvGreenSH = null;
+	private RenderTexture lpvBlueSH = null;
+	private RenderTexture lpvLuminance = null;
 
 	private Camera[] cameras = null;
-	public Camera rsmCamera = null;
+	private Camera rsmCamera = null;
 
 	// Use this for initialization
 	void Start () {
