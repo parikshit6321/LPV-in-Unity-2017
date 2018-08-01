@@ -216,8 +216,8 @@ public class LPVLighting : MonoBehaviour {
 		}
 
 		LPVGridInjection (ref firstCascade, firstCascadeBoundary);
-		LPVGridInjection (ref firstCascade, secondCascadeBoundary);
-		LPVGridInjection (ref firstCascade, thirdCascadeBoundary);
+		LPVGridInjection (ref secondCascade, secondCascadeBoundary);
+		LPVGridInjection (ref thirdCascade, thirdCascadeBoundary);
 
 		for (int i = 0; i < propagationSteps; ++i) {
 			LPVGridPropagation (ref firstCascade);
