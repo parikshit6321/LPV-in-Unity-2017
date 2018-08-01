@@ -35,7 +35,7 @@ public class LPVLighting : MonoBehaviour {
 	private LPVCascade thirdCascade;
 
 	private Camera[] cameras = null;
-	private Camera rsmCamera = null;
+	private List<Camera> rsmCameras =null;
 
 	private RenderTextureDescriptor lpvTextureDescriptorSH;
 	private RenderTextureDescriptor lpvTextureDescriptorLuminance;
@@ -116,17 +116,20 @@ public class LPVLighting : MonoBehaviour {
 	private void InitializeRSMCamera () {
 
 		cameras = Resources.FindObjectsOfTypeAll<Camera> ();
+		rsmCameras = new List<Camera> ();
 
 		for (int i = 0; i < cameras.Length; ++i) {
 			if (cameras [i].GetComponent<RSMCameraScript> () != null) {
-				rsmCamera = cameras [i];
-				break;
+				rsmCameras.Add (cameras [i]);
 			}
 		}
 
-		if (rsmCamera != null) {
-			rsmCamera.GetComponent<RSMCameraScript> ().Initialize ();
+		for (int i = 0; i < rsmCameras.Count; ++i) {
+			if (rsmCameras[i] != null) {
+				rsmCameras[i].GetComponent<RSMCameraScript> ().Initialize ();
+			}
 		}
+
 
 	}
 
@@ -148,20 +151,31 @@ public class LPVLighting : MonoBehaviour {
 		int kernelHandle = lpvInjectionShader.FindKernel("CSMain");
 
 		if (rsmVPLInjection) {
-			// RSM textures injection
-			lpvInjectionShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
-			lpvInjectionShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
-			lpvInjectionShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSH);
-			lpvInjectionShader.SetTexture(kernelHandle, "lpvLuminance", cascade.lpvLuminance);
-			lpvInjectionShader.SetInt("lpvDimension", lpvDimension);
-			lpvInjectionShader.SetFloat("worldVolumeBoundary", cascadeBoundary);
-			lpvInjectionShader.SetTexture(kernelHandle, "lightingTexture", rsmCamera.GetComponent<RSMCameraScript>().lightingTexture);
-			lpvInjectionShader.SetTexture(kernelHandle, "positionTexture", rsmCamera.GetComponent<RSMCameraScript>().positionTexture);
-			lpvInjectionShader.SetTexture(kernelHandle, "normalTexture", rsmCamera.GetComponent<RSMCameraScript>().normalTexture);
-			lpvInjectionShader.Dispatch(kernelHandle, rsmCamera.GetComponent<RSMCameraScript>().resolution.x, rsmCamera.GetComponent<RSMCameraScript>().resolution.y, 1);
+
+			for (int i = 0; i < rsmCameras.Count; ++i) {
+			
+				if (rsmCameras [i] != null) {
+
+					// RSM textures injection
+					lpvInjectionShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
+					lpvInjectionShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
+					lpvInjectionShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSH);
+					lpvInjectionShader.SetTexture(kernelHandle, "lpvLuminance", cascade.lpvLuminance);
+					lpvInjectionShader.SetInt("lpvDimension", lpvDimension);
+					lpvInjectionShader.SetFloat("worldVolumeBoundary", cascadeBoundary);
+					lpvInjectionShader.SetTexture(kernelHandle, "lightingTexture", rsmCameras[i].GetComponent<RSMCameraScript>().lightingTexture);
+					lpvInjectionShader.SetTexture(kernelHandle, "positionTexture", rsmCameras[i].GetComponent<RSMCameraScript>().positionTexture);
+					lpvInjectionShader.SetTexture(kernelHandle, "normalTexture", rsmCameras[i].GetComponent<RSMCameraScript>().normalTexture);
+					lpvInjectionShader.Dispatch(kernelHandle, rsmCameras[i].GetComponent<RSMCameraScript>().resolution.x, rsmCameras[i].GetComponent<RSMCameraScript>().resolution.y, 1);
+				
+				}
+
+			}
+
 		}
 
 		if (screenSpaceVPLInjection) {
+
 			// Screen textures injection
 			lpvInjectionShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
 			lpvInjectionShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
@@ -173,6 +187,7 @@ public class LPVLighting : MonoBehaviour {
 			lpvInjectionShader.SetTexture(kernelHandle, "positionTexture", positionTexture);
 			lpvInjectionShader.SetTexture(kernelHandle, "normalTexture", normalTexture);
 			lpvInjectionShader.Dispatch(kernelHandle, Screen.width, Screen.height, 1);
+		
 		}
 
 	}
@@ -210,9 +225,11 @@ public class LPVLighting : MonoBehaviour {
 		Graphics.Blit (source, positionTexture, lpvRenderMaterial, 0);
 		Graphics.Blit (source, normalTexture, lpvRenderMaterial, 1);
 
-		if (rsmCamera != null) {
-			if (rsmVPLInjection) {
-				rsmCamera.GetComponent<RSMCameraScript> ().RenderRSM ();
+		for (int i = 0; i < rsmCameras.Count; ++i) {
+			if (rsmCameras[i] != null) {
+				if (rsmVPLInjection) {
+					rsmCameras[i].GetComponent<RSMCameraScript> ().RenderRSM ();
+				}
 			}
 		}
 
