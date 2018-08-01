@@ -35,6 +35,8 @@
 		uniform float4x4					InverseProjectionMatrix;
 		uniform float4x4					InverseViewMatrix;
 
+		uniform float4						playerPosition;
+
 		uniform float						firstCascadeBoundary;
 		uniform float						secondCascadeBoundary;
 		uniform float						thirdCascadeBoundary;
@@ -139,6 +141,8 @@
 			//get view and then world positions		
 			float4 viewPos = float4(i.cameraRay.xyz * lindepth, 1.0f);
 			float3 worldPos = mul(InverseViewMatrix, viewPos).xyz;
+
+			worldPos -= playerPosition.xyz;
 
 			return float4(worldPos, 1.0f);
 		}

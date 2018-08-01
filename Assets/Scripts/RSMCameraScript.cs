@@ -29,6 +29,8 @@ public class RSMCameraScript : MonoBehaviour {
 	// Use this to render the RSM textures
 	public void RenderRSM () {
 
+		Shader.SetGlobalVector ("playerPosition", Camera.main.transform.position);
+
 		GetComponent<Camera> ().targetTexture = lightingTexture;
 		GetComponent<Camera> ().Render ();
 

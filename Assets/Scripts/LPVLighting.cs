@@ -200,6 +200,7 @@ public class LPVLighting : MonoBehaviour {
 		lpvRenderMaterial.SetFloat ("thirdCascadeBoundary", thirdCascadeBoundary);
 		lpvRenderMaterial.SetFloat ("lpvDimension", lpvDimension);
 		lpvRenderMaterial.SetFloat ("indirectLightStrength", indirectLightStrength);
+		lpvRenderMaterial.SetVector ("playerPosition", this.transform.position);
 
 		LPVGridCleanup (ref firstCascade);
 		LPVGridCleanup (ref secondCascade);

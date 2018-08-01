@@ -29,7 +29,9 @@
 				float4 worldPos : TEXCOORD1;
 			};
 
-			uniform sampler2D _MainTex;
+			uniform sampler2D 	_MainTex;
+
+			uniform float4 		playerPosition;
 
 			v2f vert (appdata v)
 			{
@@ -41,7 +43,8 @@
 
 			float4 frag (v2f i) : SV_Target
 			{
-				return i.worldPos;
+				float3 relativePosition = (i.worldPos.xyz - playerPosition.xyz);
+				return float4(relativePosition, 1.0f);
 			}
 			ENDCG
 		}
