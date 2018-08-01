@@ -23,6 +23,8 @@
 		uniform sampler2D					_CameraGBufferTexture0;
 		uniform sampler2D					positionTexture;
 		uniform sampler2D					normalTexture;
+		uniform sampler2D					firstBounceTexture;
+		uniform sampler2D					secondBounceTexture;
 
 		uniform float4x4					InverseProjectionMatrix;
 		uniform float4x4					InverseViewMatrix;
@@ -126,9 +128,8 @@
 			return float4(worldSpaceNormal, 1.0f);
 		}
 
-		float4 frag_lighting (v2f i) : SV_Target
+		float4 frag_indirect (v2f i) : SV_Target
 		{
-			float3 direct = tex2D(_MainTex, i.uv).rgb;
 			float3 indirect = float3(0.0f, 0.0f, 0.0f);
 
 			float3 albedo = tex2D(_CameraGBufferTexture0, i.uv).rgb;
@@ -150,7 +151,15 @@
 			indirect *= (albedo * ao);
 			indirect *= indirectLightStrength;
 
-			float3 finalLighting = direct + indirect;
+			return float4(indirect, 1.0f);
+		}
+
+		float4 frag_lighting (v2f i) : SV_Target
+		{
+			float3 direct = tex2D(_MainTex, i.uv);
+			float3 indirectFirstBounce = tex2D(firstBounceTexture, i.uv);
+			float3 indirectSecondBounce = tex2D(secondBounceTexture, i.uv);
+			float3 finalLighting = direct + indirectFirstBounce + indirectSecondBounce;
 			return float4(finalLighting, 1.0f);
 		}
 
@@ -174,7 +183,16 @@
 			ENDCG
 		}
 
-		// 2 : Final lighting computation
+		// 2 : Indirect lighting computation
+		Pass
+		{
+			CGPROGRAM
+			#pragma vertex vert
+			#pragma fragment frag_indirect
+			ENDCG
+		}
+
+		// 3 : Final lighting computation
 		Pass
 		{
 			CGPROGRAM

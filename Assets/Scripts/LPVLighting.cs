@@ -18,6 +18,8 @@ public class LPVLighting : MonoBehaviour {
 	private RenderTexture lightingTexture = null;
 	private RenderTexture positionTexture = null;
 	private RenderTexture normalTexture = null;
+	public RenderTexture firstBounceTexture = null;
+	public RenderTexture secondBounceTexture = null;
 
 	public RenderTexture lpvRedSH = null;
 	public RenderTexture lpvGreenSH = null;
@@ -43,6 +45,8 @@ public class LPVLighting : MonoBehaviour {
 		lightingTexture = new RenderTexture (Screen.width, Screen.height, 0, RenderTextureFormat.ARGBFloat);
 		positionTexture = new RenderTexture (Screen.width, Screen.height, 0, RenderTextureFormat.ARGBFloat);
 		normalTexture = new RenderTexture (Screen.width, Screen.height, 0, RenderTextureFormat.ARGBFloat);
+		firstBounceTexture = new RenderTexture (Screen.width, Screen.height, 0, RenderTextureFormat.ARGBFloat);
+		secondBounceTexture = new RenderTexture (Screen.width, Screen.height, 0, RenderTextureFormat.ARGBFloat);
 
 	}
 
@@ -120,8 +124,8 @@ public class LPVLighting : MonoBehaviour {
 
 	}
 
-	// Function to inject the vpl data into LPV grid as spherical harmonics
-	private void LPVGridInjection () {
+	// Function to inject the direct vpl data into LPV grid as spherical harmonics
+	private void LPVGridInjectionDirect () {
 
 		// RSM textures injection
 		int kernelHandle = lpvInjectionShader.FindKernel("CSMain");
@@ -150,6 +154,23 @@ public class LPVLighting : MonoBehaviour {
 
 	}
 
+	// Function to inject the indirect vpl data into LPV grid as spherical harmonics
+	private void LPVGridInjectionIndirect () {
+
+		// Screen textures injection
+		int kernelHandle = lpvInjectionShader.FindKernel("CSMain");
+		lpvInjectionShader.SetTexture(kernelHandle, "lpvGreenSH", lpvGreenSH);
+		lpvInjectionShader.SetTexture(kernelHandle, "lpvBlueSH", lpvBlueSH);
+		lpvInjectionShader.SetTexture(kernelHandle, "lpvLuminance", lpvLuminance);
+		lpvInjectionShader.SetInt("lpvDimension", lpvDimension);
+		lpvInjectionShader.SetFloat("worldVolumeBoundary", worldVolumeBoundary);
+		lpvInjectionShader.SetTexture(kernelHandle, "lightingTexture", firstBounceTexture);
+		lpvInjectionShader.SetTexture(kernelHandle, "positionTexture", positionTexture);
+		lpvInjectionShader.SetTexture(kernelHandle, "normalTexture", normalTexture);
+		lpvInjectionShader.Dispatch(kernelHandle, Screen.width, Screen.height, 1);
+
+	}
+
 	// Function to propagate the lighting stored as spherical harmonics in the LPV grid to its neightbouring cells
 	private void LPVGridPropagation () {
 
@@ -165,36 +186,61 @@ public class LPVLighting : MonoBehaviour {
 
 	// Called when the scene is rendered into the framebuffer
 	void OnRenderImage (RenderTexture source, RenderTexture destination) {
-
+		
 		lpvRenderMaterial.SetMatrix ("InverseViewMatrix", GetComponent<Camera>().cameraToWorldMatrix);
 		lpvRenderMaterial.SetMatrix ("InverseProjectionMatrix", GetComponent<Camera>().projectionMatrix.inverse);
 		lpvRenderMaterial.SetFloat ("worldVolumeBoundary", worldVolumeBoundary);
 		lpvRenderMaterial.SetFloat ("lpvDimension", lpvDimension);
 		lpvRenderMaterial.SetFloat ("indirectLightStrength", indirectLightStrength);
 
-		LPVGridCleanup ();
-
 		Graphics.Blit (source, lightingTexture);
 		Graphics.Blit (source, positionTexture, lpvRenderMaterial, 0);
 		Graphics.Blit (source, normalTexture, lpvRenderMaterial, 1);
+
+		lpvRenderMaterial.SetTexture ("positionTexture", positionTexture);
+		lpvRenderMaterial.SetTexture ("normalTexture", normalTexture);
+
+		// First bounce computation
+
+		LPVGridCleanup ();
 
 		if (rsmCamera != null) {
 			rsmCamera.GetComponent<RSMCameraScript> ().RenderRSM ();
 		}
 
-		LPVGridInjection ();
+		LPVGridInjectionDirect ();
 
 		for (int i = 0; i < propagationSteps; ++i) {
 			LPVGridPropagation ();
 		}
 
-		lpvRenderMaterial.SetTexture ("positionTexture", positionTexture);
-		lpvRenderMaterial.SetTexture ("normalTexture", normalTexture);
 		lpvRenderMaterial.SetTexture ("lpvRedSH", lpvRedSH);
 		lpvRenderMaterial.SetTexture ("lpvGreenSH", lpvGreenSH);
 		lpvRenderMaterial.SetTexture ("lpvBlueSH", lpvBlueSH);
 
-		Graphics.Blit (source, destination, lpvRenderMaterial, 2);
+		Graphics.Blit (source, firstBounceTexture, lpvRenderMaterial, 2);
+
+		// Second bounce computation
+
+		LPVGridCleanup ();
+
+		LPVGridInjectionIndirect ();
+
+		for (int i = 0; i < propagationSteps; ++i) {
+			LPVGridPropagation ();
+		}
+
+		lpvRenderMaterial.SetTexture ("lpvRedSH", lpvRedSH);
+		lpvRenderMaterial.SetTexture ("lpvGreenSH", lpvGreenSH);
+		lpvRenderMaterial.SetTexture ("lpvBlueSH", lpvBlueSH);
+
+		Graphics.Blit (source, secondBounceTexture, lpvRenderMaterial, 2);
+
+		// Blending
+
+		lpvRenderMaterial.SetTexture ("firstBounceTexture", firstBounceTexture);
+		lpvRenderMaterial.SetTexture ("secondBounceTexture", secondBounceTexture);
+		Graphics.Blit (source, destination, lpvRenderMaterial, 3);
 
 	}
 }
