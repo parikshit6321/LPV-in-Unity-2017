@@ -13,17 +13,9 @@
 
 		#include "UnityCG.cginc"
 
-		// Structure representing an individual LPV Cell
-		struct LPVCell
-		{
-			float4 redSH;
-			float4 greenSH;
-			float4 blueSH;
-			float luminance;
-			int directionFlag;
-		};
-
-		uniform StructuredBuffer<LPVCell>	lpvGridBuffer;
+		uniform sampler3D					lpvRedSH;
+		uniform sampler3D					lpvGreenSH;
+		uniform sampler3D					lpvBlueSH;
 
 		uniform sampler2D 					_MainTex;
 		uniform sampler2D					_CameraDepthTexture;
@@ -77,17 +69,13 @@
 			return float4(SH_C0, -SH_C1 * dir.y, SH_C1 * dir.z, -SH_C1 * dir.x);
 		}
 
-		// Function to get index of voxel in the grid from world position
-		inline int GetCellIndex (float3 worldPosition)
+		// Function to get position of cell in the grid from world position
+		inline float3 GetCellPosition (float3 worldPosition)
 		{
 			float3 encodedPosition = worldPosition / worldVolumeBoundary;
 			encodedPosition += float3(1.0f, 1.0f, 1.0f);
 			encodedPosition /= 2.0f;
-
-			float3 cellPosition = encodedPosition * lpvDimension;
-			int3 temp = (int3)(cellPosition);
-			int cellIndex = (temp.x * lpvDimension * lpvDimension) + (temp.y * lpvDimension) + (temp.z);
-			return cellIndex;
+			return encodedPosition;
 		}
 
 		v2f vert (appdata v)
@@ -149,13 +137,13 @@
 			float3 worldPosition = tex2D(positionTexture, i.uv);
 			float3 worldNormal = tex2D(normalTexture, i.uv);
 
-			int cellIndex = GetCellIndex(worldPosition);
+			float3 cellPosition = GetCellPosition(worldPosition);
 
 			float4 SHintensity = dirToSH(normalize(-worldNormal));
 
-			float4 currentCellRedSH = lpvGridBuffer[cellIndex].redSH;
-			float4 currentCellGreenSH = lpvGridBuffer[cellIndex].greenSH;
-			float4 currentCellBlueSH = lpvGridBuffer[cellIndex].blueSH;
+			float4 currentCellRedSH = tex3D(lpvRedSH, cellPosition);
+			float4 currentCellGreenSH = tex3D(lpvGreenSH, cellPosition);
+			float4 currentCellBlueSH = tex3D(lpvBlueSH, cellPosition);
 
 			indirect = float3(dot(SHintensity, currentCellRedSH), dot(SHintensity, currentCellGreenSH), dot(SHintensity, currentCellBlueSH));
 			indirect = (max(0.0f, indirect) / PI);

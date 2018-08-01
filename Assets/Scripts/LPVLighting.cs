@@ -19,16 +19,10 @@ public class LPVLighting : MonoBehaviour {
 	private RenderTexture positionTexture = null;
 	private RenderTexture normalTexture = null;
 
-	public struct LPVCell {
-		public Vector4 redSH;
-		public Vector4 greenSH;
-		public Vector4 blueSH;
-		public float luminance;
-		public int directionFlag;
-	};
-
-	private LPVCell[] lpvGridData = null;
-	private ComputeBuffer lpvGridBuffer = null;
+	public RenderTexture lpvRedSH = null;
+	public RenderTexture lpvGreenSH = null;
+	public RenderTexture lpvBlueSH = null;
+	public RenderTexture lpvLuminance = null;
 
 	private Camera[] cameras = null;
 	public Camera rsmCamera = null;
@@ -38,7 +32,7 @@ public class LPVLighting : MonoBehaviour {
 
 		GetComponent<Camera> ().depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.DepthNormals;
 
-		InitializeLPVGrid ();
+		InitializeLPVTextures ();
 
 		InitializeRSMCamera ();
 
@@ -52,22 +46,40 @@ public class LPVLighting : MonoBehaviour {
 
 	}
 
-	// Function to create and set the compute buffer for the LPV grid
-	private void InitializeLPVGrid () {
+	// Function to create the 3D LPV Textures
+	private void InitializeLPVTextures () {
 
-		lpvGridData = new LPVCell[lpvDimension * lpvDimension * lpvDimension];
+		RenderTextureDescriptor lpvTextureDescriptorSH = new RenderTextureDescriptor ();
+		lpvTextureDescriptorSH.bindMS = false;
+		lpvTextureDescriptorSH.colorFormat = RenderTextureFormat.ARGBFloat;
+		lpvTextureDescriptorSH.depthBufferBits = 0;
+		lpvTextureDescriptorSH.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
+		lpvTextureDescriptorSH.enableRandomWrite = true;
+		lpvTextureDescriptorSH.height = lpvDimension;
+		lpvTextureDescriptorSH.msaaSamples = 1;
+		lpvTextureDescriptorSH.volumeDepth = lpvDimension;
+		lpvTextureDescriptorSH.width = lpvDimension;
 
-		for (int i = 0; i < lpvDimension * lpvDimension * lpvDimension; ++i)
-		{
-			lpvGridData [i].redSH = Vector4.zero;
-			lpvGridData [i].greenSH = Vector4.zero;
-			lpvGridData [i].blueSH = Vector4.zero;
-			lpvGridData [i].luminance = 0.0f;
-			lpvGridData [i].directionFlag = 0;
-		}
+		RenderTextureDescriptor lpvTextureDescriptorLuminance = new RenderTextureDescriptor ();
+		lpvTextureDescriptorLuminance.bindMS = false;
+		lpvTextureDescriptorLuminance.colorFormat = RenderTextureFormat.RFloat;
+		lpvTextureDescriptorLuminance.depthBufferBits = 0;
+		lpvTextureDescriptorLuminance.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
+		lpvTextureDescriptorLuminance.enableRandomWrite = true;
+		lpvTextureDescriptorLuminance.height = lpvDimension;
+		lpvTextureDescriptorLuminance.msaaSamples = 1;
+		lpvTextureDescriptorLuminance.volumeDepth = lpvDimension;
+		lpvTextureDescriptorLuminance.width = lpvDimension;
 
-		lpvGridBuffer = new ComputeBuffer(lpvGridData.Length, 56);
-		lpvGridBuffer.SetData(lpvGridData);
+		lpvRedSH = new RenderTexture (lpvTextureDescriptorSH);
+		lpvGreenSH = new RenderTexture (lpvTextureDescriptorSH);
+		lpvBlueSH = new RenderTexture (lpvTextureDescriptorSH);
+		lpvLuminance = new RenderTexture (lpvTextureDescriptorLuminance);
+	
+		lpvRedSH.filterMode = FilterMode.Trilinear;
+		lpvGreenSH.filterMode = FilterMode.Trilinear;
+		lpvBlueSH.filterMode = FilterMode.Trilinear;
+		lpvLuminance.filterMode = FilterMode.Trilinear;
 
 	}
 
@@ -93,8 +105,10 @@ public class LPVLighting : MonoBehaviour {
 	private void LPVGridCleanup () {
 
 		int kernelHandle = lpvCleanupShader.FindKernel("CSMain");
-		lpvCleanupShader.SetBuffer(kernelHandle, "lpvGridBuffer", lpvGridBuffer);
-		lpvCleanupShader.SetInt("lpvDimension", lpvDimension);
+		lpvCleanupShader.SetTexture(kernelHandle, "lpvRedSH", lpvRedSH);
+		lpvCleanupShader.SetTexture(kernelHandle, "lpvGreenSH", lpvGreenSH);
+		lpvCleanupShader.SetTexture(kernelHandle, "lpvBlueSH", lpvBlueSH);
+		lpvCleanupShader.SetTexture(kernelHandle, "lpvLuminance", lpvLuminance);
 		lpvCleanupShader.Dispatch(kernelHandle, lpvDimension, lpvDimension, lpvDimension);
 
 	}
@@ -104,7 +118,10 @@ public class LPVLighting : MonoBehaviour {
 
 		// RSM textures injection
 		int kernelHandle = lpvInjectionShader.FindKernel("CSMain");
-		lpvInjectionShader.SetBuffer(kernelHandle, "lpvGridBuffer", lpvGridBuffer);
+		lpvInjectionShader.SetTexture(kernelHandle, "lpvRedSH", lpvRedSH);
+		lpvInjectionShader.SetTexture(kernelHandle, "lpvGreenSH", lpvGreenSH);
+		lpvInjectionShader.SetTexture(kernelHandle, "lpvBlueSH", lpvBlueSH);
+		lpvInjectionShader.SetTexture(kernelHandle, "lpvLuminance", lpvLuminance);
 		lpvInjectionShader.SetInt("lpvDimension", lpvDimension);
 		lpvInjectionShader.SetFloat("worldVolumeBoundary", worldVolumeBoundary);
 		lpvInjectionShader.SetTexture(kernelHandle, "lightingTexture", rsmCamera.GetComponent<RSMCameraScript>().lightingTexture);
@@ -113,7 +130,10 @@ public class LPVLighting : MonoBehaviour {
 		lpvInjectionShader.Dispatch(kernelHandle, rsmCamera.GetComponent<RSMCameraScript>().resolution.x, rsmCamera.GetComponent<RSMCameraScript>().resolution.y, 1);
 
 		// Screen textures injection
-		lpvInjectionShader.SetBuffer(kernelHandle, "lpvGridBuffer", lpvGridBuffer);
+		lpvInjectionShader.SetTexture(kernelHandle, "lpvRedSH", lpvRedSH);
+		lpvInjectionShader.SetTexture(kernelHandle, "lpvGreenSH", lpvGreenSH);
+		lpvInjectionShader.SetTexture(kernelHandle, "lpvBlueSH", lpvBlueSH);
+		lpvInjectionShader.SetTexture(kernelHandle, "lpvLuminance", lpvLuminance);
 		lpvInjectionShader.SetInt("lpvDimension", lpvDimension);
 		lpvInjectionShader.SetFloat("worldVolumeBoundary", worldVolumeBoundary);
 		lpvInjectionShader.SetTexture(kernelHandle, "lightingTexture", lightingTexture);
@@ -127,18 +147,12 @@ public class LPVLighting : MonoBehaviour {
 	private void LPVGridPropagation () {
 
 		int kernelHandle = lpvPropagationShader.FindKernel("CSMain");
-		lpvPropagationShader.SetBuffer(kernelHandle, "lpvGridBuffer", lpvGridBuffer);
+		lpvPropagationShader.SetTexture(kernelHandle, "lpvRedSH", lpvRedSH);
+		lpvPropagationShader.SetTexture(kernelHandle, "lpvGreenSH", lpvGreenSH);
+		lpvPropagationShader.SetTexture(kernelHandle, "lpvBlueSH", lpvBlueSH);
+		lpvPropagationShader.SetTexture(kernelHandle, "lpvLuminance", lpvLuminance);
 		lpvPropagationShader.SetInt("lpvDimension", lpvDimension);
 		lpvPropagationShader.Dispatch(kernelHandle, lpvDimension, lpvDimension, lpvDimension);
-
-	}
-
-	// Called when the game object is destroyed
-	void OnDestroy () {
-
-		if (lpvGridBuffer != null) {
-			lpvGridBuffer.Release ();
-		}
 
 	}
 
@@ -169,7 +183,9 @@ public class LPVLighting : MonoBehaviour {
 
 		lpvRenderMaterial.SetTexture ("positionTexture", positionTexture);
 		lpvRenderMaterial.SetTexture ("normalTexture", normalTexture);
-		lpvRenderMaterial.SetBuffer ("lpvGridBuffer", lpvGridBuffer);
+		lpvRenderMaterial.SetTexture ("lpvRedSH", lpvRedSH);
+		lpvRenderMaterial.SetTexture ("lpvGreenSH", lpvGreenSH);
+		lpvRenderMaterial.SetTexture ("lpvBlueSH", lpvBlueSH);
 
 		Graphics.Blit (source, destination, lpvRenderMaterial, 2);
 

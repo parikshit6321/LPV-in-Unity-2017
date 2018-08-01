@@ -13,18 +13,11 @@
 #define POSWS_BIAS_NORMAL 2.0
 #define POSWS_BIAS_LIGHT 1.0
 
-// Structure representing an individual LPV Cell
-struct LPVCell
-{
-	float4 redSH;
-	float4 greenSH;
-	float4 blueSH;
-	float luminance;
-	int directionFlag;
-};
-
-// Readable/Writable structured buffer for storing the voxel grid
-RWStructuredBuffer<LPVCell>	lpvGridBuffer;
+// Readable/Writable textures for LPV grid
+RWTexture3D<float4>	lpvRedSH;
+RWTexture3D<float4>	lpvGreenSH;
+RWTexture3D<float4>	lpvBlueSH;
+RWTexture3D<float>	lpvLuminance;
 
 // Lighting texture with just direct lighting
 Texture2D<float4> lightingTexture;
@@ -49,17 +42,15 @@ inline float4 dirToSH(float3 dir) {
 	return float4(SH_C0, -SH_C1 * dir.y, SH_C1 * dir.z, -SH_C1 * dir.x);
 }
 
-// Function to get index of cell in the grid from world position
-inline int GetCellIndex (float3 worldPosition)
+// Function to get position of cell in the grid from world position
+inline uint3 GetCellPosition (float3 worldPosition)
 {
 	float3 encodedPosition = worldPosition / worldVolumeBoundary;
 	encodedPosition += float3(1.0f, 1.0f, 1.0f);
 	encodedPosition /= 2.0f;
 
 	float3 cellPosition = encodedPosition * lpvDimension;
-	int3 temp = (int3)(cellPosition);
-	int cellIndex = (temp.x * lpvDimension * lpvDimension) + (temp.y * lpvDimension) + (temp.z);
-	return cellIndex;
+	return ((uint3)(cellPosition));
 }
 
 // Function to get luminance of the input color
@@ -77,14 +68,14 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
 	float newLuminance = GetLuminance(vplFlux);
 
-	int lpvCellIndex = GetCellIndex(vplPosition);
+	uint3 lpvCellPosition = GetCellPosition(vplPosition);
 
-	if (newLuminance > lpvGridBuffer[lpvCellIndex].luminance) 
+	if (newLuminance > lpvLuminance[lpvCellPosition]) 
 	{
 		float4 coeffs = (dirToCosineLobe(vplNormal) / PI);
-		lpvGridBuffer[lpvCellIndex].redSH = coeffs * vplFlux.r;
-		lpvGridBuffer[lpvCellIndex].greenSH = coeffs * vplFlux.g;
-		lpvGridBuffer[lpvCellIndex].blueSH = coeffs * vplFlux.b;
-		lpvGridBuffer[lpvCellIndex].luminance = newLuminance;
+		lpvRedSH[lpvCellPosition] = coeffs * vplFlux.r;
+		lpvGreenSH[lpvCellPosition] = coeffs * vplFlux.g;
+		lpvBlueSH[lpvCellPosition] = coeffs * vplFlux.b;
+		lpvLuminance[lpvCellPosition] = newLuminance;
 	}
 }

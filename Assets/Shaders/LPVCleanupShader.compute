@@ -1,29 +1,17 @@
 ﻿// Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CSMain
 
-// Structure representing an individual LPV Cell
-struct LPVCell
-{
-	float4 redSH;
-	float4 greenSH;
-	float4 blueSH;
-	float luminance;
-	int directionFlag;
-};
-
-// Readable/Writable structured buffer for storing the voxel grid
-RWStructuredBuffer<LPVCell>	lpvGridBuffer;
-
-// Dimension of the LPV Grid
-int lpvDimension;
+// Readable/Writable textures for LPV grid
+RWTexture3D<float4>	lpvRedSH;
+RWTexture3D<float4>	lpvGreenSH;
+RWTexture3D<float4>	lpvBlueSH;
+RWTexture3D<float>	lpvLuminance;
 
 [numthreads(1,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-	int cellIndex = (id.x * lpvDimension * lpvDimension) + (id.y * lpvDimension) + (id.z);
-	lpvGridBuffer[cellIndex].redSH = float4(0.0f, 0.0f, 0.0f, 0.0f);
-	lpvGridBuffer[cellIndex].greenSH = float4(0.0f, 0.0f, 0.0f, 0.0f);
-	lpvGridBuffer[cellIndex].blueSH = float4(0.0f, 0.0f, 0.0f, 0.0f);
-	lpvGridBuffer[cellIndex].luminance = 0.0f;
-	lpvGridBuffer[cellIndex].directionFlag = 0;
+	lpvRedSH[id.xyz] = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	lpvGreenSH[id.xyz] = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	lpvBlueSH[id.xyz] = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	lpvLuminance[id.xyz] = 0.0f;
 }
