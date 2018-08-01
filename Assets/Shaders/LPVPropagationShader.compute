@@ -1,0 +1,136 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+/*Spherical harmonics coefficients – precomputed*/
+#define SH_c0 0.282094792f // 1 / 2sqrt(pi)
+#define SH_c1 0.488602512f // sqrt(3/pi) / 2
+
+/*Cosine lobe coeff*/
+#define SH_cosLobe_c0 0.886226925f // sqrt(pi)/2
+#define SH_cosLobe_c1 1.02332671f // sqrt(pi/3)
+#define Pi 3.1415926f
+
+// Structure representing an individual LPV Cell
+struct LPVCell
+{
+	float4 redSH;
+	float4 greenSH;
+	float4 blueSH;
+	float luminance;
+	int directionFlag;
+};
+
+// Readable/Writable structured buffer for storing the voxel grid
+RWStructuredBuffer<LPVCell>	lpvGridBuffer;
+
+// Dimension of the LPV Grid
+int lpvDimension;
+
+inline float4 dirToCosineLobe(float3 dir) {
+	return float4(SH_cosLobe_c0, -SH_cosLobe_c1 * dir.y, SH_cosLobe_c1 * dir.z, -SH_cosLobe_c1 * dir.x);
+}
+
+inline float4 dirToSH(float3 dir) {
+	return float4(SH_c0, -SH_c1 * dir.y, SH_c1 * dir.z, -SH_c1 * dir.x);
+}
+
+static const float3 directions[6] = { float3(0,0,1), float3(0,0,-1), float3(1,0,0), float3(-1,0,0) , float3(0,1,0), float3(0,-1,0)};
+float2 side[4] = { float2(1.0, 0.0), float2(0.0, 1.0), float2(-1.0, 0.0), float2(0.0, -1.0) };
+
+// orientation = [ right | up | forward ] = [ x | y | z ]
+float3x3 neighbourOrientations[6] = {
+// Z+
+float3x3(1, 0, 0,0, 1, 0,0, 0, 1),
+// Z-
+float3x3(-1, 0, 0,0, 1, 0,0, 0, -1),
+// X+
+float3x3(0, 0, 1,0, 1, 0,-1, 0, 0
+),
+// X-
+float3x3(0, 0, -1,0, 1, 0,1, 0, 0),
+// Y+
+float3x3(1, 0, 0,0, 0, 1,0, -1, 0),
+// Y-
+float3x3(1, 0, 0,0, 0, -1,0, 1, 0)
+};
+
+inline float3 getEvalSideDirection(uint index, float3x3 orientation) {
+	const float smallComponent = 0.4472135; // 1 / sqrt(5)
+	const float bigComponent = 0.894427; // 2 / sqrt(5)
+
+	const float2 s = side[index];
+	// *either* x = 0 or y = 0
+	return mul(orientation, float3(s.x * smallComponent, s.y * smallComponent, bigComponent));
+}
+
+inline float3 getReprojSideDirection(uint index, float3x3 orientation) {
+	const float2 s = side[index];
+	return mul(orientation, float3(s.x, s.y, 0));
+}
+
+inline uint GetBufferIndex (uint3 input)
+{
+	return ((input.x * lpvDimension * lpvDimension) + (input.y * lpvDimension) + (input.z));
+}
+
+[numthreads(1,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+	uint3 cellIndex = id.xyz;
+
+	// contribution
+	float4 cR = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	float4 cG = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	float4 cB = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	float lum = 0.0f;
+
+	for (uint neighbour = 0; neighbour < 6; ++neighbour)
+	{
+		float3x3 orientation = neighbourOrientations[neighbour];
+		float3 mainDirection = mul(orientation, float3(0.0f, 0.0f, 1.0f));
+
+		uint3 neighbourIndex = cellIndex - directions[neighbour];
+		float4 rCoeffsNeighbour = lpvGridBuffer[GetBufferIndex(neighbourIndex)].redSH;
+		float4 gCoeffsNeighbour = lpvGridBuffer[GetBufferIndex(neighbourIndex)].greenSH;
+		float4 bCoeffsNeighbour = lpvGridBuffer[GetBufferIndex(neighbourIndex)].blueSH;
+		float luminanceNeighbour = lpvGridBuffer[GetBufferIndex(neighbourIndex)].luminance;
+
+		const float directFaceSubtendedSolidAngle = 0.4006696846f / Pi / 2;
+		const float sideFaceSubtendedSolidAngle = 0.4234413544f / Pi / 3;
+
+		for (uint sideFace = 0; sideFace < 4; ++sideFace)
+		{
+			float3 evalDirection = getEvalSideDirection(sideFace, orientation);
+			float3 reprojDirection = getReprojSideDirection(sideFace, orientation);
+
+			float4 reprojDirectionCosineLobeSH = dirToCosineLobe(reprojDirection);
+			float4 evalDirectionSH = dirToSH(evalDirection);
+
+			cR += sideFaceSubtendedSolidAngle * dot(rCoeffsNeighbour, evalDirectionSH) * reprojDirectionCosineLobeSH;
+			cG += sideFaceSubtendedSolidAngle * dot(gCoeffsNeighbour, evalDirectionSH) * reprojDirectionCosineLobeSH;
+			cB += sideFaceSubtendedSolidAngle * dot(bCoeffsNeighbour, evalDirectionSH) * reprojDirectionCosineLobeSH;
+		}
+
+		float3 curDir = directions[neighbour];
+		float4 curCosLobe = dirToCosineLobe(curDir);
+		float4 curDirSH = dirToSH(curDir);
+
+		if (luminanceNeighbour > 0.0f)
+		{
+			bool flagCheck = (lpvGridBuffer[GetBufferIndex(id.xyz)].directionFlag & (1 << neighbour));
+			if (!flagCheck)
+			{
+				lum += luminanceNeighbour / 6.0f;
+				lpvGridBuffer[GetBufferIndex(id.xyz)].directionFlag = (lpvGridBuffer[GetBufferIndex(id.xyz)].directionFlag | (1 << neighbour));
+			}
+		}
+
+		cR += directFaceSubtendedSolidAngle * max(0.0f, dot(rCoeffsNeighbour, curDirSH)) * curCosLobe;
+		cG += directFaceSubtendedSolidAngle * max(0.0f, dot(gCoeffsNeighbour, curDirSH)) * curCosLobe;
+		cB += directFaceSubtendedSolidAngle * max(0.0f, dot(bCoeffsNeighbour, curDirSH)) * curCosLobe;
+	}
+
+	lpvGridBuffer[GetBufferIndex(id.xyz)].redSH += cR;
+	lpvGridBuffer[GetBufferIndex(id.xyz)].greenSH += cG;
+	lpvGridBuffer[GetBufferIndex(id.xyz)].blueSH += cB;
+}

@@ -1,0 +1,90 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+/*Spherical harmonics coefficients – precomputed*/
+#define SH_C0 0.282094792f // 1 / 2sqrt(pi)
+#define SH_C1 0.488602512f // sqrt(3/pi) / 2
+
+/*Cosine lobe coeff*/
+#define SH_cosLobe_C0 0.886226925f // sqrt(pi)/2
+#define SH_cosLobe_C1 1.02332671f // sqrt(pi/3)
+#define PI 3.1415926f
+
+#define POSWS_BIAS_NORMAL 2.0
+#define POSWS_BIAS_LIGHT 1.0
+
+// Structure representing an individual LPV Cell
+struct LPVCell
+{
+	float4 redSH;
+	float4 greenSH;
+	float4 blueSH;
+	float luminance;
+	int directionFlag;
+};
+
+// Readable/Writable structured buffer for storing the voxel grid
+RWStructuredBuffer<LPVCell>	lpvGridBuffer;
+
+// Lighting texture with just direct lighting
+Texture2D<float4> lightingTexture;
+
+// World-space position texture
+Texture2D<float4> positionTexture;
+
+// World-space normal texture
+Texture2D<float4> normalTexture;
+
+// Dimension of the LPV Grid
+int lpvDimension;
+
+// Boundary of the LPV Grid
+float worldVolumeBoundary;
+
+inline float4 dirToCosineLobe(float3 dir) {
+	return float4(SH_cosLobe_C0, -SH_cosLobe_C1 * dir.y, SH_cosLobe_C1 * dir.z, -SH_cosLobe_C1 * dir.x);
+}
+
+inline float4 dirToSH(float3 dir) {
+	return float4(SH_C0, -SH_C1 * dir.y, SH_C1 * dir.z, -SH_C1 * dir.x);
+}
+
+// Function to get index of cell in the grid from world position
+inline int GetCellIndex (float3 worldPosition)
+{
+	float3 encodedPosition = worldPosition / worldVolumeBoundary;
+	encodedPosition += float3(1.0f, 1.0f, 1.0f);
+	encodedPosition /= 2.0f;
+
+	float3 cellPosition = encodedPosition * lpvDimension;
+	int3 temp = (int3)(cellPosition);
+	int cellIndex = (temp.x * lpvDimension * lpvDimension) + (temp.y * lpvDimension) + (temp.z);
+	return cellIndex;
+}
+
+// Function to get luminance of the input color
+inline float GetLuminance (float3 color)
+{
+	return ((color.r * 0.299f) + (color.g * 0.587f) + (color.b * 0.114f));
+}
+
+[numthreads(1,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+	float3 vplFlux = lightingTexture[id.xy].rgb;
+	float3 vplPosition = positionTexture[id.xy].rgb;
+	float3 vplNormal = normalize(normalTexture[id.xy].rgb);
+
+	float newLuminance = GetLuminance(vplFlux);
+
+	int lpvCellIndex = GetCellIndex(vplPosition);
+
+	if (newLuminance > lpvGridBuffer[lpvCellIndex].luminance) 
+	{
+		float4 coeffs = (dirToCosineLobe(vplNormal) / PI);
+		lpvGridBuffer[lpvCellIndex].redSH = coeffs * vplFlux.r;
+		lpvGridBuffer[lpvCellIndex].greenSH = coeffs * vplFlux.g;
+		lpvGridBuffer[lpvCellIndex].blueSH = coeffs * vplFlux.b;
+		lpvGridBuffer[lpvCellIndex].luminance = newLuminance;
+	}
+}
