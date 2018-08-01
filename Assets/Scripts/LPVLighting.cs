@@ -59,6 +59,7 @@ public class LPVLighting : MonoBehaviour {
 		lpvTextureDescriptorSH.msaaSamples = 1;
 		lpvTextureDescriptorSH.volumeDepth = lpvDimension;
 		lpvTextureDescriptorSH.width = lpvDimension;
+		lpvTextureDescriptorSH.sRGB = true;
 
 		RenderTextureDescriptor lpvTextureDescriptorLuminance = new RenderTextureDescriptor ();
 		lpvTextureDescriptorLuminance.bindMS = false;
@@ -70,6 +71,7 @@ public class LPVLighting : MonoBehaviour {
 		lpvTextureDescriptorLuminance.msaaSamples = 1;
 		lpvTextureDescriptorLuminance.volumeDepth = lpvDimension;
 		lpvTextureDescriptorLuminance.width = lpvDimension;
+		lpvTextureDescriptorLuminance.sRGB = true;
 
 		lpvRedSH = new RenderTexture (lpvTextureDescriptorSH);
 		lpvGreenSH = new RenderTexture (lpvTextureDescriptorSH);
@@ -80,6 +82,11 @@ public class LPVLighting : MonoBehaviour {
 		lpvGreenSH.filterMode = FilterMode.Trilinear;
 		lpvBlueSH.filterMode = FilterMode.Trilinear;
 		lpvLuminance.filterMode = FilterMode.Trilinear;
+
+		lpvRedSH.Create ();
+		lpvGreenSH.Create ();
+		lpvBlueSH.Create ();
+		lpvLuminance.Create ();
 
 	}
 
