@@ -10,6 +10,10 @@ public class LPVLighting : MonoBehaviour {
 		public RenderTexture lpvGreenSH;
 		public RenderTexture lpvBlueSH;
 		public RenderTexture lpvLuminance;
+		public RenderTexture lpvRedSHBackBuffer;
+		public RenderTexture lpvGreenSHBackBuffer;
+		public RenderTexture lpvBlueSHBackBuffer;
+		public RenderTexture lpvLuminanceBackBuffer;
 	};
 
 	public ComputeShader lpvCleanupShader = null;
@@ -67,15 +71,28 @@ public class LPVLighting : MonoBehaviour {
 		cascade.lpvBlueSH = new RenderTexture (lpvTextureDescriptorSH);
 		cascade.lpvLuminance = new RenderTexture (lpvTextureDescriptorLuminance);
 
+		cascade.lpvRedSHBackBuffer = new RenderTexture (lpvTextureDescriptorSH);
+		cascade.lpvGreenSHBackBuffer = new RenderTexture (lpvTextureDescriptorSH);
+		cascade.lpvBlueSHBackBuffer = new RenderTexture (lpvTextureDescriptorSH);
+		cascade.lpvLuminanceBackBuffer = new RenderTexture (lpvTextureDescriptorLuminance);
+
 		cascade.lpvRedSH.filterMode = FilterMode.Trilinear;
 		cascade.lpvGreenSH.filterMode = FilterMode.Trilinear;
 		cascade.lpvBlueSH.filterMode = FilterMode.Trilinear;
 		cascade.lpvLuminance.filterMode = FilterMode.Trilinear;
+		cascade.lpvRedSHBackBuffer.filterMode = FilterMode.Trilinear;
+		cascade.lpvGreenSHBackBuffer.filterMode = FilterMode.Trilinear;
+		cascade.lpvBlueSHBackBuffer.filterMode = FilterMode.Trilinear;
+		cascade.lpvLuminanceBackBuffer.filterMode = FilterMode.Trilinear;
 
 		cascade.lpvRedSH.Create ();
 		cascade.lpvGreenSH.Create ();
 		cascade.lpvBlueSH.Create ();
 		cascade.lpvLuminance.Create ();
+		cascade.lpvRedSHBackBuffer.Create ();
+		cascade.lpvGreenSHBackBuffer.Create ();
+		cascade.lpvBlueSHBackBuffer.Create ();
+		cascade.lpvLuminanceBackBuffer.Create ();
 
 	}
 
