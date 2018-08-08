@@ -44,6 +44,9 @@ public class LPVLighting : MonoBehaviour {
 	private RenderTextureDescriptor lpvTextureDescriptorSH;
 	private RenderTextureDescriptor lpvTextureDescriptorLuminance;
 
+	private bool bDisplayBackBuffer = false;
+	private int currentPropagationStep = 0;
+
 	// Use this for initialization
 	void Start () {
 
@@ -127,6 +130,9 @@ public class LPVLighting : MonoBehaviour {
 		InitializeLPVCascade (ref secondCascade);
 		InitializeLPVCascade (ref thirdCascade);
 
+		LPVGridCleanup (ref firstCascade);
+		LPVGridCleanup (ref secondCascade);
+		LPVGridCleanup (ref thirdCascade);
 	}
 
 	// Function to initialize the RSM camera
@@ -154,10 +160,19 @@ public class LPVLighting : MonoBehaviour {
 	private void LPVGridCleanup (ref LPVCascade cascade) {
 
 		int kernelHandle = lpvCleanupShader.FindKernel("CSMain");
-		lpvCleanupShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
-		lpvCleanupShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
-		lpvCleanupShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSH);
-		lpvCleanupShader.SetTexture(kernelHandle, "lpvLuminance", cascade.lpvLuminance);
+
+		if (bDisplayBackBuffer) {
+			lpvCleanupShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
+			lpvCleanupShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
+			lpvCleanupShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSH);
+			lpvCleanupShader.SetTexture(kernelHandle, "lpvLuminance", cascade.lpvLuminance);
+		} else {
+			lpvCleanupShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSHBackBuffer);
+			lpvCleanupShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSHBackBuffer);
+			lpvCleanupShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSHBackBuffer);
+			lpvCleanupShader.SetTexture(kernelHandle, "lpvLuminance", cascade.lpvLuminanceBackBuffer);
+		}
+
 		lpvCleanupShader.Dispatch(kernelHandle, lpvDimension, lpvDimension, lpvDimension);
 
 	}
@@ -174,10 +189,18 @@ public class LPVLighting : MonoBehaviour {
 				if (rsmCameras [i] != null) {
 
 					// RSM textures injection
-					lpvInjectionShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
-					lpvInjectionShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
-					lpvInjectionShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSH);
-					lpvInjectionShader.SetTexture(kernelHandle, "lpvLuminance", cascade.lpvLuminance);
+					if (bDisplayBackBuffer) {
+						lpvInjectionShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
+						lpvInjectionShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
+						lpvInjectionShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSH);
+						lpvInjectionShader.SetTexture(kernelHandle, "lpvLuminance", cascade.lpvLuminance);
+					} else {
+						lpvInjectionShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSHBackBuffer);
+						lpvInjectionShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSHBackBuffer);
+						lpvInjectionShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSHBackBuffer);
+						lpvInjectionShader.SetTexture(kernelHandle, "lpvLuminance", cascade.lpvLuminanceBackBuffer);
+					}
+
 					lpvInjectionShader.SetInt("lpvDimension", lpvDimension);
 					lpvInjectionShader.SetFloat("worldVolumeBoundary", cascadeBoundary);
 					lpvInjectionShader.SetTexture(kernelHandle, "lightingTexture", rsmCameras[i].GetComponent<RSMCameraScript>().lightingTexture);
@@ -194,10 +217,18 @@ public class LPVLighting : MonoBehaviour {
 		if (screenSpaceVPLInjection) {
 
 			// Screen textures injection
-			lpvInjectionShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
-			lpvInjectionShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
-			lpvInjectionShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSH);
-			lpvInjectionShader.SetTexture(kernelHandle, "lpvLuminance", cascade.lpvLuminance);
+			// RSM textures injection
+			if (bDisplayBackBuffer) {
+				lpvInjectionShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
+				lpvInjectionShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
+				lpvInjectionShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSH);
+				lpvInjectionShader.SetTexture(kernelHandle, "lpvLuminance", cascade.lpvLuminance);
+			} else {
+				lpvInjectionShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSHBackBuffer);
+				lpvInjectionShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSHBackBuffer);
+				lpvInjectionShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSHBackBuffer);
+				lpvInjectionShader.SetTexture(kernelHandle, "lpvLuminance", cascade.lpvLuminanceBackBuffer);
+			}
 			lpvInjectionShader.SetInt("lpvDimension", lpvDimension);
 			lpvInjectionShader.SetFloat("cascadeBoundary", cascadeBoundary);
 			lpvInjectionShader.SetTexture(kernelHandle, "lightingTexture", lightingTexture);
@@ -213,10 +244,17 @@ public class LPVLighting : MonoBehaviour {
 	private void LPVGridPropagation (ref LPVCascade cascade) {
 
 		int kernelHandle = lpvPropagationShader.FindKernel("CSMain");
-		lpvPropagationShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
-		lpvPropagationShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
-		lpvPropagationShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSH);
-		lpvPropagationShader.SetTexture(kernelHandle, "lpvLuminance", cascade.lpvLuminance);
+
+		if (bDisplayBackBuffer) {
+			lpvPropagationShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
+			lpvPropagationShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
+			lpvPropagationShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSH);
+		} else {
+			lpvPropagationShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSHBackBuffer);
+			lpvPropagationShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSHBackBuffer);
+			lpvPropagationShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSHBackBuffer);
+		}
+
 		lpvPropagationShader.SetInt("lpvDimension", lpvDimension);
 		lpvPropagationShader.Dispatch(kernelHandle, lpvDimension, lpvDimension, lpvDimension);
 
@@ -234,10 +272,6 @@ public class LPVLighting : MonoBehaviour {
 		lpvRenderMaterial.SetFloat ("indirectLightStrength", indirectLightStrength);
 		lpvRenderMaterial.SetVector ("playerPosition", this.transform.position);
 
-		LPVGridCleanup (ref firstCascade);
-		LPVGridCleanup (ref secondCascade);
-		LPVGridCleanup (ref thirdCascade);
-
 		Graphics.Blit (source, lightingTexture);
 		Graphics.Blit (source, positionTexture, lpvRenderMaterial, 0);
 		Graphics.Blit (source, normalTexture, lpvRenderMaterial, 1);
@@ -254,26 +288,48 @@ public class LPVLighting : MonoBehaviour {
 		LPVGridInjection (ref secondCascade, secondCascadeBoundary);
 		LPVGridInjection (ref thirdCascade, thirdCascadeBoundary);
 
-		for (int i = 0; i < propagationSteps; ++i) {
-			LPVGridPropagation (ref firstCascade);
-			LPVGridPropagation (ref secondCascade);
-			LPVGridPropagation (ref thirdCascade);
+		LPVGridPropagation (ref firstCascade);
+		LPVGridPropagation (ref secondCascade);
+		LPVGridPropagation (ref thirdCascade);
+
+		++currentPropagationStep;
+
+		if (currentPropagationStep >= propagationSteps) {
+			currentPropagationStep = 0;
+			bDisplayBackBuffer = !bDisplayBackBuffer;
+			LPVGridCleanup (ref firstCascade);
+			LPVGridCleanup (ref secondCascade);
+			LPVGridCleanup (ref thirdCascade);
 		}
 
 		lpvRenderMaterial.SetTexture ("positionTexture", positionTexture);
 		lpvRenderMaterial.SetTexture ("normalTexture", normalTexture);
 
-		lpvRenderMaterial.SetTexture ("lpvRedSHFirstCascade", firstCascade.lpvRedSH);
-		lpvRenderMaterial.SetTexture ("lpvGreenSHFirstCascade", firstCascade.lpvGreenSH);
-		lpvRenderMaterial.SetTexture ("lpvBlueSHFirstCascade", firstCascade.lpvBlueSH);
+		if (bDisplayBackBuffer) {
+			lpvRenderMaterial.SetTexture ("lpvRedSHFirstCascade", firstCascade.lpvRedSHBackBuffer);
+			lpvRenderMaterial.SetTexture ("lpvGreenSHFirstCascade", firstCascade.lpvGreenSHBackBuffer);
+			lpvRenderMaterial.SetTexture ("lpvBlueSHFirstCascade", firstCascade.lpvBlueSHBackBuffer);
 
-		lpvRenderMaterial.SetTexture ("lpvRedSHSecondCascade", secondCascade.lpvRedSH);
-		lpvRenderMaterial.SetTexture ("lpvGreenSHSecondCascade", secondCascade.lpvGreenSH);
-		lpvRenderMaterial.SetTexture ("lpvBlueSHSecondCascade", secondCascade.lpvBlueSH);
+			lpvRenderMaterial.SetTexture ("lpvRedSHSecondCascade", secondCascade.lpvRedSHBackBuffer);
+			lpvRenderMaterial.SetTexture ("lpvGreenSHSecondCascade", secondCascade.lpvGreenSHBackBuffer);
+			lpvRenderMaterial.SetTexture ("lpvBlueSHSecondCascade", secondCascade.lpvBlueSHBackBuffer);
 
-		lpvRenderMaterial.SetTexture ("lpvRedSHThirdCascade", thirdCascade.lpvRedSH);
-		lpvRenderMaterial.SetTexture ("lpvGreenSHThirdCascade", thirdCascade.lpvGreenSH);
-		lpvRenderMaterial.SetTexture ("lpvBlueSHThirdCascade", thirdCascade.lpvBlueSH);
+			lpvRenderMaterial.SetTexture ("lpvRedSHThirdCascade", thirdCascade.lpvRedSHBackBuffer);
+			lpvRenderMaterial.SetTexture ("lpvGreenSHThirdCascade", thirdCascade.lpvGreenSHBackBuffer);
+			lpvRenderMaterial.SetTexture ("lpvBlueSHThirdCascade", thirdCascade.lpvBlueSHBackBuffer);
+		} else {
+			lpvRenderMaterial.SetTexture ("lpvRedSHFirstCascade", firstCascade.lpvRedSH);
+			lpvRenderMaterial.SetTexture ("lpvGreenSHFirstCascade", firstCascade.lpvGreenSH);
+			lpvRenderMaterial.SetTexture ("lpvBlueSHFirstCascade", firstCascade.lpvBlueSH);
+
+			lpvRenderMaterial.SetTexture ("lpvRedSHSecondCascade", secondCascade.lpvRedSH);
+			lpvRenderMaterial.SetTexture ("lpvGreenSHSecondCascade", secondCascade.lpvGreenSH);
+			lpvRenderMaterial.SetTexture ("lpvBlueSHSecondCascade", secondCascade.lpvBlueSH);
+
+			lpvRenderMaterial.SetTexture ("lpvRedSHThirdCascade", thirdCascade.lpvRedSH);
+			lpvRenderMaterial.SetTexture ("lpvGreenSHThirdCascade", thirdCascade.lpvGreenSH);
+			lpvRenderMaterial.SetTexture ("lpvBlueSHThirdCascade", thirdCascade.lpvBlueSH);
+		}
 
 		Graphics.Blit (source, destination, lpvRenderMaterial, 2);
 
