@@ -14,7 +14,6 @@
 RWTexture3D<float4>	lpvRedSH;
 RWTexture3D<float4>	lpvGreenSH;
 RWTexture3D<float4>	lpvBlueSH;
-RWTexture3D<float>	lpvLuminance;
 
 // Dimension of the LPV Grid
 int lpvDimension;

@@ -8,12 +8,11 @@ public class RSMCameraScript : MonoBehaviour {
 	public Shader positionShader = null;
 	public Shader normalShader = null;
 
-
 	public RenderTexture lightingTexture = null;
-
 	public RenderTexture positionTexture = null;
-
 	public RenderTexture normalTexture = null;
+
+	private Vector3 relativePosition = Vector3.zero;
 
 	// Use this for initialization
 	public void Initialize () {
@@ -24,8 +23,17 @@ public class RSMCameraScript : MonoBehaviour {
 
 		GetComponent<Camera> ().depthTextureMode = DepthTextureMode.Depth;
 
+		relativePosition = this.transform.position - Camera.main.transform.position;
+
 	}
-	
+
+	// Use this for updating position of the rsm camera with the player
+	void Update () {
+
+		this.transform.position = Camera.main.transform.position + relativePosition;
+
+	}
+
 	// Use this to render the RSM textures
 	public void RenderRSM () {
 

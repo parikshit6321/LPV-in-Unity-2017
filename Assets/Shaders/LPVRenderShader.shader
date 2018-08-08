@@ -40,7 +40,6 @@
 		uniform float						firstCascadeBoundary;
 		uniform float						secondCascadeBoundary;
 		uniform float						thirdCascadeBoundary;
-		uniform float						indirectLightStrength;
 
 		uniform int							lpvDimension;
 
@@ -158,7 +157,7 @@
 			return float4(worldSpaceNormal, 1.0f);
 		}
 
-		float4 frag_lighting (v2f i) : SV_Target
+		float4 frag_lighting (v2f_world_pos i) : SV_Target
 		{
 			float3 direct = tex2D(_MainTex, i.uv).rgb;
 			float3 indirect = float3(0.0f, 0.0f, 0.0f);
@@ -166,8 +165,22 @@
 			float3 albedo = tex2D(_CameraGBufferTexture0, i.uv).rgb;
 			float ao = tex2D(_CameraGBufferTexture0, i.uv).a;
 
-			float3 worldPosition = tex2D(positionTexture, i.uv);
-			float3 worldNormal = tex2D(normalTexture, i.uv);
+			// read low res depth and reconstruct world position
+			float depth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, i.uv);
+			//linearise depth		
+			float lindepth = Linear01Depth (depth);
+			
+			//get view and then world positions		
+			float4 viewPos = float4(i.cameraRay.xyz * lindepth, 1.0f);
+			float3 worldPosition = mul(InverseViewMatrix, viewPos).xyz;
+			worldPosition -= playerPosition.xyz;
+
+			float depthValue;
+			float3 viewNormal;
+			DecodeDepthNormal(tex2D(_CameraDepthNormalsTexture, i.uv), depthValue, viewNormal);
+			viewNormal = normalize(viewNormal);
+			float3 worldNormal = mul((float3x3)InverseViewMatrix, viewNormal);
+			worldNormal = normalize(worldNormal);
 
 			float4 SHintensity = dirToSH(normalize(-worldNormal));
 
@@ -205,7 +218,6 @@
 			indirect = float3(dot(SHintensity, currentCellRedSH), dot(SHintensity, currentCellGreenSH), dot(SHintensity, currentCellBlueSH));
 			indirect = (max(0.0f, indirect) / PI);
 			indirect *= (albedo * ao);
-			indirect *= indirectLightStrength;
 
 			float3 finalLighting = direct + indirect;
 			return float4(finalLighting, 1.0f);
@@ -235,7 +247,7 @@
 		Pass
 		{
 			CGPROGRAM
-			#pragma vertex vert
+			#pragma vertex vert_world_pos
 			#pragma fragment frag_lighting
 			ENDCG
 		}
