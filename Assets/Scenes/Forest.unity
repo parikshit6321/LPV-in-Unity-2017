@@ -15522,13 +15522,15 @@ MonoBehaviour:
   lpvInjectionShader: {fileID: 7200000, guid: 7feaf502b11368a4293b289403120b22, type: 3}
   lpvPropagationShader: {fileID: 7200000, guid: 8b814cbdfb0a23142a510e7939a0b4cf,
     type: 3}
+  lpvPropagationCompositionShader: {fileID: 7200000, guid: ce10db36d6b69f745859a0b6520645e8,
+    type: 3}
   lpvRenderShader: {fileID: 4800000, guid: 0e21e3c51d1aa664eb4ca4add85b0498, type: 3}
   backBuffering: 1
   rsmVPLInjection: 1
   screenSpaceVPLInjection: 0
   screenSpaceVPLTextureResolution: {x: 512, y: 512}
   lpvDimension: 32
-  propagationSteps: 12
+  propagationSteps: 8
   firstCascadeBoundary: 50
   secondCascadeBoundary: 100
   thirdCascadeBoundary: 200

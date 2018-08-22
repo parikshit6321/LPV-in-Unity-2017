@@ -10,10 +10,15 @@
 #define SH_cosLobe_c1 1.02332671f // sqrt(pi/3)
 #define Pi 3.1415926f
 
-// Readable/Writable textures for LPV grid
-RWTexture3D<float4>	lpvRedSH;
-RWTexture3D<float4>	lpvGreenSH;
-RWTexture3D<float4>	lpvBlueSH;
+// Readable/Writable input textures for LPV grid
+RWTexture3D<float4>	lpvRedSHInput;
+RWTexture3D<float4>	lpvGreenSHInput;
+RWTexture3D<float4>	lpvBlueSHInput;
+
+// Readable/Writable output textures for LPV grid
+RWTexture3D<float4>	lpvRedSHOutput;
+RWTexture3D<float4>	lpvGreenSHOutput;
+RWTexture3D<float4>	lpvBlueSHOutput;
 
 // Dimension of the LPV Grid
 int lpvDimension;
@@ -76,9 +81,9 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 		float3 mainDirection = mul(orientation, float3(0.0f, 0.0f, 1.0f));
 
 		uint3 neighbourIndex = cellIndex - directions[neighbour];
-		float4 rCoeffsNeighbour = lpvRedSH[neighbourIndex];
-		float4 gCoeffsNeighbour = lpvGreenSH[neighbourIndex];
-		float4 bCoeffsNeighbour = lpvBlueSH[neighbourIndex];
+		float4 rCoeffsNeighbour = lpvRedSHInput[neighbourIndex];
+		float4 gCoeffsNeighbour = lpvGreenSHInput[neighbourIndex];
+		float4 bCoeffsNeighbour = lpvBlueSHInput[neighbourIndex];
 
 		const float directFaceSubtendedSolidAngle = 0.4006696846f / Pi / 2;
 		const float sideFaceSubtendedSolidAngle = 0.4234413544f / Pi / 3;
@@ -105,7 +110,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 		cB += directFaceSubtendedSolidAngle * max(0.0f, dot(bCoeffsNeighbour, curDirSH)) * curCosLobe;
 	}
 
-	lpvRedSH[id.xyz] += cR;
-	lpvGreenSH[id.xyz] += cG;
-	lpvBlueSH[id.xyz] += cB;
+	lpvRedSHOutput[id.xyz] = cR;
+	lpvGreenSHOutput[id.xyz] = cG;
+	lpvBlueSHOutput[id.xyz] = cB;
 }

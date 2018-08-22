@@ -14,12 +14,16 @@ public class LPVLighting : MonoBehaviour {
 		public RenderTexture lpvGreenSHBackBuffer;
 		public RenderTexture lpvBlueSHBackBuffer;
 		public RenderTexture lpvLuminanceBackBuffer;
+		public RenderTexture lpvRedPropagationBuffer;
+		public RenderTexture lpvGreenPropagationBuffer;
+		public RenderTexture lpvBluePropagationBuffer;
 	};
 
 	[Header("Shaders")]
 	public ComputeShader lpvCleanupShader = null;
 	public ComputeShader lpvInjectionShader = null;
 	public ComputeShader lpvPropagationShader = null;
+	public ComputeShader lpvPropagationCompositionShader = null;
 	public Shader lpvRenderShader = null;
 
 	[Header("LPV Settings")]
@@ -78,6 +82,10 @@ public class LPVLighting : MonoBehaviour {
 		cascade.lpvBlueSH = new RenderTexture (lpvTextureDescriptorSH);
 		cascade.lpvLuminance = new RenderTexture (lpvTextureDescriptorLuminance);
 
+		cascade.lpvRedPropagationBuffer = new RenderTexture (lpvTextureDescriptorSH);
+		cascade.lpvGreenPropagationBuffer = new RenderTexture (lpvTextureDescriptorSH);
+		cascade.lpvBluePropagationBuffer = new RenderTexture (lpvTextureDescriptorSH);
+
 		cascade.lpvRedSHBackBuffer = new RenderTexture (lpvTextureDescriptorSH);
 		cascade.lpvGreenSHBackBuffer = new RenderTexture (lpvTextureDescriptorSH);
 		cascade.lpvBlueSHBackBuffer = new RenderTexture (lpvTextureDescriptorSH);
@@ -88,6 +96,10 @@ public class LPVLighting : MonoBehaviour {
 		cascade.lpvBlueSH.filterMode = FilterMode.Trilinear;
 		cascade.lpvLuminance.filterMode = FilterMode.Trilinear;
 
+		cascade.lpvRedPropagationBuffer.filterMode = FilterMode.Trilinear;
+		cascade.lpvGreenPropagationBuffer.filterMode = FilterMode.Trilinear;
+		cascade.lpvBluePropagationBuffer.filterMode = FilterMode.Trilinear;
+
 		cascade.lpvRedSHBackBuffer.filterMode = FilterMode.Trilinear;
 		cascade.lpvGreenSHBackBuffer.filterMode = FilterMode.Trilinear;
 		cascade.lpvBlueSHBackBuffer.filterMode = FilterMode.Trilinear;
@@ -97,6 +109,10 @@ public class LPVLighting : MonoBehaviour {
 		cascade.lpvGreenSH.Create ();
 		cascade.lpvBlueSH.Create ();
 		cascade.lpvLuminance.Create ();
+
+		cascade.lpvRedPropagationBuffer.Create ();
+		cascade.lpvGreenPropagationBuffer.Create ();
+		cascade.lpvBluePropagationBuffer.Create ();
 
 		cascade.lpvRedSHBackBuffer.Create ();
 		cascade.lpvGreenSHBackBuffer.Create ();
@@ -273,24 +289,52 @@ public class LPVLighting : MonoBehaviour {
 
 		int kernelHandle = lpvPropagationShader.FindKernel("CSMain");
 
+		lpvPropagationShader.SetTexture(kernelHandle, "lpvRedSHOutput", cascade.lpvRedPropagationBuffer);
+		lpvPropagationShader.SetTexture(kernelHandle, "lpvGreenSHOutput", cascade.lpvGreenPropagationBuffer);
+		lpvPropagationShader.SetTexture(kernelHandle, "lpvBlueSHOutput", cascade.lpvBluePropagationBuffer);
+
 		if (backBuffering) {
 			if (bDisplayBackBuffer) {
-				lpvPropagationShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
-				lpvPropagationShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
-				lpvPropagationShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSH);
+				lpvPropagationShader.SetTexture(kernelHandle, "lpvRedSHInput", cascade.lpvRedSH);
+				lpvPropagationShader.SetTexture(kernelHandle, "lpvGreenSHInput", cascade.lpvGreenSH);
+				lpvPropagationShader.SetTexture(kernelHandle, "lpvBlueSHInput", cascade.lpvBlueSH);
 			} else {
-				lpvPropagationShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSHBackBuffer);
-				lpvPropagationShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSHBackBuffer);
-				lpvPropagationShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSHBackBuffer);
+				lpvPropagationShader.SetTexture(kernelHandle, "lpvRedSHInput", cascade.lpvRedSHBackBuffer);
+				lpvPropagationShader.SetTexture(kernelHandle, "lpvGreenSHInput", cascade.lpvGreenSHBackBuffer);
+				lpvPropagationShader.SetTexture(kernelHandle, "lpvBlueSHInput", cascade.lpvBlueSHBackBuffer);
 			}
 		} else {
-			lpvPropagationShader.SetTexture(kernelHandle, "lpvRedSH", cascade.lpvRedSH);
-			lpvPropagationShader.SetTexture(kernelHandle, "lpvGreenSH", cascade.lpvGreenSH);
-			lpvPropagationShader.SetTexture(kernelHandle, "lpvBlueSH", cascade.lpvBlueSH);
+			lpvPropagationShader.SetTexture(kernelHandle, "lpvRedSHInput", cascade.lpvRedSH);
+			lpvPropagationShader.SetTexture(kernelHandle, "lpvGreenSHInput", cascade.lpvGreenSH);
+			lpvPropagationShader.SetTexture(kernelHandle, "lpvBlueSHInput", cascade.lpvBlueSH);
 		}
 
 		lpvPropagationShader.SetInt("lpvDimension", lpvDimension);
 		lpvPropagationShader.Dispatch(kernelHandle, lpvDimension, lpvDimension, lpvDimension);
+
+		kernelHandle = lpvPropagationCompositionShader.FindKernel("CSMain");
+
+		lpvPropagationCompositionShader.SetTexture(kernelHandle, "lpvRedSHInput", cascade.lpvRedPropagationBuffer);
+		lpvPropagationCompositionShader.SetTexture(kernelHandle, "lpvGreenSHInput", cascade.lpvGreenPropagationBuffer);
+		lpvPropagationCompositionShader.SetTexture(kernelHandle, "lpvBlueSHInput", cascade.lpvBluePropagationBuffer);
+
+		if (backBuffering) {
+			if (bDisplayBackBuffer) {
+				lpvPropagationCompositionShader.SetTexture(kernelHandle, "lpvRedSHOutput", cascade.lpvRedSH);
+				lpvPropagationCompositionShader.SetTexture(kernelHandle, "lpvGreenSHOutput", cascade.lpvGreenSH);
+				lpvPropagationCompositionShader.SetTexture(kernelHandle, "lpvBlueSHOutput", cascade.lpvBlueSH);
+			} else {
+				lpvPropagationCompositionShader.SetTexture(kernelHandle, "lpvRedSHOutput", cascade.lpvRedSHBackBuffer);
+				lpvPropagationCompositionShader.SetTexture(kernelHandle, "lpvGreenSHOutput", cascade.lpvGreenSHBackBuffer);
+				lpvPropagationCompositionShader.SetTexture(kernelHandle, "lpvBlueSHOutput", cascade.lpvBlueSHBackBuffer);
+			}
+		} else {
+			lpvPropagationCompositionShader.SetTexture(kernelHandle, "lpvRedSHOutput", cascade.lpvRedSH);
+			lpvPropagationCompositionShader.SetTexture(kernelHandle, "lpvGreenSHOutput", cascade.lpvGreenSH);
+			lpvPropagationCompositionShader.SetTexture(kernelHandle, "lpvBlueSHOutput", cascade.lpvBlueSH);
+		}
+
+		lpvPropagationCompositionShader.Dispatch(kernelHandle, lpvDimension, lpvDimension, lpvDimension);
 
 	}
 
